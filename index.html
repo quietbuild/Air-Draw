@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AIR DRAW — Neural Canvas Interface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════ ROOT VARS ═══════════════════════ */
+:root {
+  --bg:          #04040e;
+  --panel:       rgba(6,6,20,0.80);
+  --gborder:     rgba(0,255,247,0.13);
+  --cyan:        #00fff7;
+  --cyan-dim:    rgba(0,255,247,0.55);
+  --magenta:     #ff00e5;
+  --green:       #00ff88;
+  --amber:       #ffb800;
+  --violet:      #bf40ff;
+  --soft:        rgba(210,225,255,0.85);
+  --fd:          'Orbitron',monospace;
+  --fm:          'Share Tech Mono',monospace;
+  --fb:          'Rajdhani',sans-serif;
+  --r:           11px;
+  --ease:        all .2s cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--soft);font-family:var(--fb);user-select:none;-webkit-user-select:none}
+
+/* Animated grid bg */
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(rgba(0,255,247,.022) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,255,247,.022) 1px,transparent 1px);
+  background-size:52px 52px;animation:gd 18s linear infinite}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 90% 55% at 50% 0%,rgba(0,130,255,.055) 0%,transparent 70%),
+             radial-gradient(ellipse 60% 40% at 85% 100%,rgba(191,64,255,.045) 0%,transparent 70%)}
+@keyframes gd{from{background-position:0 0,0 0}to{background-position:0 52px,52px 0}}
+
+/* ═══════════════════════ LAYOUT ═══════════════════════ */
+#app{position:relative;width:100%;height:100vh;display:flex;flex-direction:column;z-index:1}
+#drawCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;cursor:none}
+#overlayCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
+
+/* ═══════════════════════ HEADER ═══════════════════════ */
+#header{
+  position:relative;z-index:20;display:flex;align-items:center;gap:14px;
+  padding:9px 18px;
+  background:var(--panel);
+  backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+  border-bottom:1px solid var(--gborder);
+  box-shadow:0 4px 40px rgba(0,0,0,.65),0 0 50px rgba(0,255,247,.025);
+  flex-shrink:0
+}
+.logo{display:flex;flex-direction:column;line-height:1;margin-right:6px}
+.logo-a{font-family:var(--fd);font-size:14px;font-weight:900;letter-spacing:.22em;
+  background:linear-gradient(100deg,var(--cyan),var(--magenta));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 8px rgba(0,255,247,.45))}
+.logo-b{font-family:var(--fm);font-size:7.5px;letter-spacing:.32em;color:var(--cyan-dim);margin-top:3px}
+.sep{width:1px;height:34px;background:linear-gradient(to bottom,transparent,var(--gborder),transparent);flex-shrink:0}
+
+/* Color buttons */
+.pal{display:flex;align-items:center;gap:5px}
+.plbl{font-family:var(--fm);font-size:8.5px;letter-spacing:.18em;color:var(--cyan-dim);margin-right:3px}
+.cb{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;
+  transition:var(--ease);background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cb .sw{width:15px;height:15px;border-radius:50%;transition:var(--ease)}
+.cb:hover .sw{transform:scale(1.2)}
+.cb.active{box-shadow:0 0 14px currentColor,inset 0 0 6px rgba(255,255,255,.1)}
+.cb.active .sw{transform:scale(1.15)}
+.cb[data-c="cyan"]{color:var(--cyan)}.cb[data-c="cyan"] .sw{background:radial-gradient(circle,#90fffc,var(--cyan));box-shadow:0 0 8px var(--cyan)}
+.cb[data-c="magenta"]{color:var(--magenta)}.cb[data-c="magenta"] .sw{background:radial-gradient(circle,#ff90f5,var(--magenta));box-shadow:0 0 8px var(--magenta)}
+.cb[data-c="green"]{color:var(--green)}.cb[data-c="green"] .sw{background:radial-gradient(circle,#90ffd4,var(--green));box-shadow:0 0 8px var(--green)}
+.cb[data-c="amber"]{color:var(--amber)}.cb[data-c="amber"] .sw{background:radial-gradient(circle,#ffe080,var(--amber));box-shadow:0 0 8px var(--amber)}
+.cb[data-c="violet"]{color:var(--violet)}.cb[data-c="violet"] .sw{background:radial-gradient(circle,#df9fff,var(--violet));box-shadow:0 0 8px var(--violet)}
+
+/* Brush slider */
+.bgrp{display:flex;align-items:center;gap:9px}
+.blbl{font-family:var(--fm);font-size:8.5px;letter-spacing:.18em;color:var(--cyan-dim);white-space:nowrap}
+#bslider{-webkit-appearance:none;appearance:none;width:85px;height:3px;border-radius:2px;outline:none;cursor:pointer;
+  background:linear-gradient(to right,var(--cyan) 0%,var(--cyan) var(--v,30%),rgba(0,255,247,.15) var(--v,30%),rgba(0,255,247,.15) 100%)}
+#bslider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:#fff;box-shadow:0 0 6px var(--cyan);cursor:pointer;transition:var(--ease)}
+#bslider::-webkit-slider-thumb:hover{transform:scale(1.2);box-shadow:0 0 14px var(--cyan)}
+.bval{font-family:var(--fm);font-size:10px;color:var(--soft);min-width:18px}
+
+/* Action buttons */
+.acts{display:flex;align-items:center;gap:7px;margin-left:auto}
+.abtn{display:flex;align-items:center;gap:5px;padding:6px 13px;border-radius:7px;
+  border:1px solid var(--gborder);background:rgba(255,255,255,.04);color:var(--soft);
+  cursor:pointer;font-family:var(--fm);font-size:9.5px;letter-spacing:.11em;
+  transition:var(--ease);white-space:nowrap;backdrop-filter:blur(8px)}
+.abtn:hover{background:rgba(0,255,247,.08);border-color:rgba(0,255,247,.4);color:var(--cyan);
+  box-shadow:0 0 16px rgba(0,255,247,.14),inset 0 0 8px rgba(0,255,247,.04)}
+.abtn.danger:hover{background:rgba(255,30,80,.1);border-color:rgba(255,30,80,.4);color:#ff4477;box-shadow:0 0 16px rgba(255,30,80,.14)}
+
+/* ═══════════════════════ STATUS HUB ═══════════════════════ */
+#statHub{
+  position:absolute;top:62px;left:50%;transform:translateX(-50%);z-index:30;
+  display:flex;align-items:center;gap:8px;padding:6px 17px;
+  background:rgba(4,4,14,.88);backdrop-filter:blur(20px);
+  border:1px solid var(--gborder);border-radius:100px;
+  box-shadow:0 4px 24px rgba(0,0,0,.55),0 0 20px rgba(0,255,247,.04);
+  white-space:nowrap;transition:var(--ease)
+}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan);
+  animation:pulse 1.4s ease-in-out infinite;flex-shrink:0}
+.sdot.ld{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.sdot.dr{background:var(--magenta);box-shadow:0 0 6px var(--magenta)}
+.sdot.hv{background:var(--green);box-shadow:0 0 6px var(--green)}
+.sdot.id{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.sdot.er{background:#ff3355;box-shadow:0 0 6px #ff3355;animation:none}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.7)}}
+#statTxt{font-family:var(--fm);font-size:10.5px;letter-spacing:.09em;color:var(--soft)}
+
+/* ═══════════════════════ FINGER STATE HUD ═══════════════════════ */
+#fingerHud{
+  position:absolute;top:62px;right:24px;z-index:30;
+  display:flex;flex-direction:column;gap:6px;
+  padding:12px 14px;
+  background:var(--panel);backdrop-filter:blur(20px);
+  border:1px solid var(--gborder);border-radius:var(--r);
+  box-shadow:0 4px 24px rgba(0,0,0,.5)
+}
+.fhud-title{font-family:var(--fm);font-size:7.5px;letter-spacing:.28em;color:var(--cyan-dim);margin-bottom:3px}
+.frow{display:flex;align-items:center;gap:8px}
+.fname{font-family:var(--fm);font-size:8px;letter-spacing:.08em;color:rgba(200,210,240,.5);width:46px}
+.fbar{width:52px;height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
+.fbar-fill{height:100%;border-radius:2px;width:0%;transition:.1s ease;background:rgba(100,100,100,.5)}
+.fbar-fill.up{background:var(--green);box-shadow:0 0 6px var(--green)}
+.fpin{width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);transition:var(--ease)}
+.fpin.up{background:var(--green);border-color:var(--green);box-shadow:0 0 6px var(--green)}
+.fpin.dn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15)}
+.gesture-badge{
+  margin-top:5px;padding:5px 10px;border-radius:6px;
+  font-family:var(--fm);font-size:8px;letter-spacing:.15em;text-align:center;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
+  color:rgba(200,210,240,.5);transition:var(--ease)
+}
+.gesture-badge.draw{color:var(--magenta);border-color:rgba(255,0,229,.3);background:rgba(255,0,229,.06);box-shadow:0 0 10px rgba(255,0,229,.1)}
+.gesture-badge.hover{color:var(--green);border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.06);box-shadow:0 0 10px rgba(0,255,136,.1)}
+.gesture-badge.pause{color:var(--amber);border-color:rgba(255,184,0,.3);background:rgba(255,184,0,.06)}
+
+/* ═══════════════════════ CAMERA PREVIEW ═══════════════════════ */
+#camWrap{position:absolute;bottom:28px;left:22px;z-index:25;width:210px}
+.cam-frame{position:relative;border-radius:10px;overflow:hidden;
+  box-shadow:0 0 0 1px var(--gborder),0 0 28px rgba(0,255,247,.09),0 8px 32px rgba(0,0,0,.6)}
+#camVid{display:block;width:100%;transform:scaleX(-1);background:#000;border-radius:10px;opacity:0;transition:opacity .6s}
+#camVid.on{opacity:1}
+/* skeleton canvas overlaid on video */
+#skelCanvas{position:absolute;inset:0;width:100%;height:100%;border-radius:10px;transform:scaleX(-1)}
+.cam-frame::before,.cam-frame::after,.cbl,.cbr{content:'';position:absolute;width:13px;height:13px;z-index:4;pointer-events:none}
+.cam-frame::before{top:0;left:0;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan);border-radius:4px 0 0 0;box-shadow:-2px -2px 8px rgba(0,255,247,.35)}
+.cam-frame::after{top:0;right:0;border-top:2px solid var(--cyan);border-right:2px solid var(--cyan);border-radius:0 4px 0 0;box-shadow:2px -2px 8px rgba(0,255,247,.35)}
+.cbl{bottom:0;left:0;border-bottom:2px solid var(--cyan);border-left:2px solid var(--cyan);border-radius:0 0 0 4px;box-shadow:-2px 2px 8px rgba(0,255,247,.35)}
+.cbr{bottom:0;right:0;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan);border-radius:0 0 4px 0;box-shadow:2px 2px 8px rgba(0,255,247,.35)}
+.scanline{position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px)}
+.cam-lbl{position:absolute;bottom:0;left:0;right:0;z-index:5;
+  display:flex;align-items:center;justify-content:space-between;padding:4px 8px;pointer-events:none;
+  background:linear-gradient(to top,rgba(4,4,14,.92) 0%,transparent 100%);
+  font-family:var(--fm);font-size:7.5px;letter-spacing:.13em;color:var(--cyan-dim)}
+.recdot{width:5px;height:5px;border-radius:50%;background:var(--magenta);box-shadow:0 0 4px var(--magenta);animation:pulse 1s ease-in-out infinite}
+
+/* ═══════════════════════ GESTURE GUIDE ═══════════════════════ */
+#guide{
+  position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:25;
+  display:flex;gap:0;
+  background:var(--panel);backdrop-filter:blur(20px);
+  border:1px solid var(--gborder);border-radius:var(--r);
+  box-shadow:0 4px 24px rgba(0,0,0,.5);overflow:hidden
+}
+.gcard{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 18px;
+  font-family:var(--fm);font-size:8px;letter-spacing:.1em;cursor:default}
+.gcard+.gcard{border-left:1px solid var(--gborder)}
+.gcard .icon{font-size:20px;line-height:1}
+.gcard .gname{color:var(--soft);font-size:8.5px;font-weight:600}
+.gcard .gdesc{color:rgba(180,195,225,.45);font-size:7.5px;text-align:center;line-height:1.4}
+.gcard.active-draw{background:rgba(255,0,229,.07)}
+.gcard.active-hover{background:rgba(0,255,136,.06)}
+.gcard.active-pause{background:rgba(255,184,0,.06)}
+
+/* ═══════════════════════ CURSOR DOT ═══════════════════════ */
+#cur{position:absolute;z-index:50;pointer-events:none;
+  width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+  background:#fff;box-shadow:0 0 8px var(--cyan),0 0 20px rgba(0,255,247,.5);
+  transition:opacity .12s;opacity:0}
+
+/* ═══════════════════════ COPYRIGHT ═══════════════════════ */
+#copy{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);z-index:30;
+  font-family:var(--fm);font-size:8.5px;letter-spacing:.26em;
+  color:rgba(140,190,210,.35);white-space:nowrap;pointer-events:none}
+
+/* ═══════════════════════ TOAST ═══════════════════════ */
+#toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(16px);z-index:200;
+  padding:9px 20px;background:rgba(0,255,247,.11);border:1px solid rgba(0,255,247,.28);
+  border-radius:100px;font-family:var(--fm);font-size:10px;letter-spacing:.13em;
+  color:var(--cyan);opacity:0;pointer-events:none;transition:all .28s ease;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ═══════════════════════ LOADING ═══════════════════════ */
+#loadOvl{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;background:var(--bg);transition:opacity .7s}
+#loadOvl.gone{opacity:0;pointer-events:none}
+.ltitle{font-family:var(--fd);font-size:30px;font-weight:900;letter-spacing:.24em;
+  background:linear-gradient(100deg,var(--cyan),var(--magenta),var(--cyan));background-size:200% 100%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  animation:sh 2s linear infinite}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.lsub{font-family:var(--fm);font-size:10px;letter-spacing:.25em;color:var(--cyan-dim)}
+.lbar-w{width:220px;height:3px;background:rgba(0,255,247,.1);border-radius:2px;overflow:hidden}
+.lbar{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--magenta));border-radius:2px;
+  box-shadow:0 0 10px var(--cyan);transition:width .35s ease}
+
+@media(max-width:680px){
+  .blbl,.plbl{display:none}#bslider{width:55px}
+  #guide{display:none}#camWrap{width:140px}
+  .logo-b{display:none}.abtn span{display:none}
+  #fingerHud{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="loadOvl">
+  <div class="ltitle">AIR DRAW</div>
+  <div class="lsub">INITIALIZING NEURAL CANVAS INTERFACE</div>
+  <div class="lbar-w"><div class="lbar" id="lbar"></div></div>
+</div>
+
+<div id="app">
+  <canvas id="drawCanvas"></canvas>
+  <canvas id="overlayCanvas"></canvas>
+  <div id="cur"></div>
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="logo">
+      <div class="logo-a">AIR DRAW</div>
+      <div class="logo-b">NEURAL CANVAS v3.0</div>
+    </div>
+    <div class="sep"></div>
+    <div class="pal">
+      <span class="plbl">COLOR</span>
+      <button class="cb active" data-c="cyan"    title="Cyber Cyan">   <div class="sw"></div></button>
+      <button class="cb"        data-c="magenta" title="Electric Magenta"><div class="sw"></div></button>
+      <button class="cb"        data-c="green"   title="Matrix Green"> <div class="sw"></div></button>
+      <button class="cb"        data-c="amber"   title="Solar Amber">  <div class="sw"></div></button>
+      <button class="cb"        data-c="violet"  title="Deep Violet">  <div class="sw"></div></button>
+    </div>
+    <div class="sep"></div>
+    <div class="bgrp">
+      <span class="blbl">BRUSH</span>
+      <input type="range" id="bslider" min="2" max="30" value="8"/>
+      <span class="bval" id="bval">8</span>
+    </div>
+    <div class="sep"></div>
+    <div class="acts">
+      <button class="abtn danger" id="clearBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        <span>CLEAR</span>
+      </button>
+      <button class="abtn" id="saveBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>EXPORT</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- STATUS HUB -->
+  <div id="statHub">
+    <div class="sdot ld" id="sdot"></div>
+    <span id="stxt">Initializing AI Models...</span>
+  </div>
+
+  <!-- FINGER STATE HUD -->
+  <div id="fingerHud">
+    <div class="fhud-title">◈ FINGER STATE</div>
+    <div class="frow">
+      <span class="fname">INDEX</span>
+      <div class="fbar"><div class="fbar-fill" id="f-idx-bar"></div></div>
+      <div class="fpin dn" id="f-idx-pin"></div>
+    </div>
+    <div class="frow">
+      <span class="fname">MIDDLE</span>
+      <div class="fbar"><div class="fbar-fill" id="f-mid-bar"></div></div>
+      <div class="fpin dn" id="f-mid-pin"></div>
+    </div>
+    <div class="frow">
+      <span class="fname">RING</span>
+      <div class="fbar"><div class="fbar-fill" id="f-rng-bar"></div></div>
+      <div class="fpin dn" id="f-rng-pin"></div>
+    </div>
+    <div class="frow">
+      <span class="fname">PINKY</span>
+      <div class="fbar"><div class="fbar-fill" id="f-pnk-bar"></div></div>
+      <div class="fpin dn" id="f-pnk-pin"></div>
+    </div>
+    <div class="gesture-badge" id="gbadge">NO HAND</div>
+  </div>
+
+  <!-- CAMERA PREVIEW -->
+  <div id="camWrap">
+    <div class="cam-frame">
+      <video id="camVid" autoplay playsinline muted></video>
+      <canvas id="skelCanvas"></canvas>
+      <div class="scanline"></div>
+      <div class="cbl"></div>
+      <div class="cbr"></div>
+      <div class="cam-lbl">
+        <span>CAM·01 ◈ NEURAL</span>
+        <div style="display:flex;align-items:center;gap:4px"><div class="recdot"></div><span>LIVE</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GESTURE GUIDE -->
+  <div id="guide">
+    <div class="gcard" id="gc-draw">
+      <div class="icon">☝️</div>
+      <div class="gname">DRAW</div>
+      <div class="gdesc">Index finger<br>extended</div>
+    </div>
+    <div class="gcard" id="gc-hover">
+      <div class="icon">✌️</div>
+      <div class="gname">LIFT PEN</div>
+      <div class="gdesc">Index + Middle<br>extended</div>
+    </div>
+    <div class="gcard" id="gc-pause">
+      <div class="icon">🖐️</div>
+      <div class="gname">PAUSE</div>
+      <div class="gdesc">3+ fingers or<br>closed fist</div>
+    </div>
+  </div>
+
+  <div id="copy">© 2026 VRISHAB VARUN. ALL RIGHTS RESERVED.</div>
+  <div id="toast"></div>
+</div>
+
+<video id="srcVid" style="display:none" autoplay playsinline muted></video>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════
+   AIR DRAW v3.0 — Robust Gesture Engine
+   ════════════════════════════════════════════════════════════════
+
+   FINGER DETECTION ALGORITHM (distance-ratio method):
+   ─────────────────────────────────────────────────────
+   For each finger, we compute:
+     • tipDist  = distance(fingertip, wrist)
+     • pipDist  = distance(PIP joint, wrist)
+   A finger is EXTENDED when tipDist > pipDist * EXTEND_RATIO
+   This is rotation-invariant and scale-invariant — works even
+   when the hand is tilted, sideways, close or far from camera.
+
+   GESTURE SMOOTHING (majority-vote buffer):
+   ─────────────────────────────────────────
+   We keep a circular buffer of the last BUFFER_LEN gesture
+   classifications. The output gesture is whichever mode appears
+   most often in the buffer. This eliminates single-frame flicker
+   without adding perceptible lag.
+
+   GESTURE SCHEME:
+   ─────────────────────────────────────────
+   • Index ONLY extended      → DRAW  (paints on canvas)
+   • Index + Middle extended  → HOVER (lifts pen, shows cursor)
+   • Anything else (0,3,4,5 fingers up, fist, open palm) → PAUSE
+   ════════════════════════════════════════════════════════════════ */
+
+// ── TUNING ──────────────────────────────────────────────────────
+const EXTEND_RATIO  = 1.12;  // tip must be 12% further than PIP from wrist
+const BUFFER_LEN    = 8;     // frames to vote across (reduces flicker)
+const LERP_ALPHA    = 0.30;  // position smoothing (lower = smoother but laggier)
+const LERP_FAST     = 0.55;  // fast lerp for large jumps
+const JUMP_THRESH   = 80;    // px — use fast lerp if hand moves this fast
+const MIN_DRAW_DIST = 1.5;   // px — skip sub-pixel moves
+const SKEL_ALPHA    = 0.82;  // skeleton overlay opacity
+
+// MediaPipe landmark indices
+const LM = {
+  WRIST:0,
+  T_TIP:4, T_IP:3, T_MCP:2,
+  I_TIP:8, I_DIP:7, I_PIP:6, I_MCP:5,
+  M_TIP:12,M_DIP:11,M_PIP:10,M_MCP:9,
+  R_TIP:16,R_DIP:15,R_PIP:14,R_MCP:13,
+  P_TIP:20,P_DIP:19,P_PIP:18,P_MCP:17,
+};
+
+// Skeleton connections for drawing
+const SKEL_CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],          // thumb
+  [0,5],[5,6],[6,7],[7,8],          // index
+  [0,9],[9,10],[10,11],[11,12],     // middle
+  [0,13],[13,14],[14,15],[15,16],   // ring
+  [0,17],[17,18],[18,19],[19,20],   // pinky
+  [5,9],[9,13],[13,17],             // palm knuckles
+];
+
+// Colors
+const COLORS = {
+  cyan:    { stroke:'#00fff7', shadow:'#00fff7', r:0,   g:255, b:247 },
+  magenta: { stroke:'#ff00e5', shadow:'#ff00e5', r:255, g:0,   b:229 },
+  green:   { stroke:'#00ff88', shadow:'#00ff88', r:0,   g:255, b:136 },
+  amber:   { stroke:'#ffb800', shadow:'#ffb800', r:255, g:184, b:0   },
+  violet:  { stroke:'#bf40ff', shadow:'#bf40ff', r:191, g:64,  b:255 },
+};
+
+// ── STATE ────────────────────────────────────────────────────────
+let S = {
+  color: 'cyan', brush: 8,
+  smoothX: null, smoothY: null,
+  prevX: null,   prevY: null,
+  gesture: 'pause',           // 'draw' | 'hover' | 'pause'
+  gestureBuffer: [],           // circular vote buffer
+  fingerScores: [0,0,0,0],   // continuous extension scores per finger [I,M,R,P]
+  hasHand: false,
+  particles: [],
+};
+
+// ── DOM ──────────────────────────────────────────────────────────
+const drawCanvas = document.getElementById('drawCanvas');
+const dctx       = drawCanvas.getContext('2d');
+const ovCanvas   = document.getElementById('overlayCanvas');
+const octx       = ovCanvas.getContext('2d');
+const skelCanvas = document.getElementById('skelCanvas');
+const sctx       = skelCanvas.getContext('2d');
+const srcVid     = document.getElementById('srcVid');
+const camVid     = document.getElementById('camVid');
+const sdot       = document.getElementById('sdot');
+const stxt       = document.getElementById('stxt');
+const cur        = document.getElementById('cur');
+const lbar       = document.getElementById('lbar');
+const loadOvl    = document.getElementById('loadOvl');
+const toast      = document.getElementById('toast');
+
+// Finger HUD elements
+const fEls = {
+  idx: { bar: document.getElementById('f-idx-bar'), pin: document.getElementById('f-idx-pin') },
+  mid: { bar: document.getElementById('f-mid-bar'), pin: document.getElementById('f-mid-pin') },
+  rng: { bar: document.getElementById('f-rng-bar'), pin: document.getElementById('f-rng-pin') },
+  pnk: { bar: document.getElementById('f-pnk-bar'), pin: document.getElementById('f-pnk-pin') },
+};
+const gbadge = document.getElementById('gbadge');
+
+// Guide cards
+const gcDraw  = document.getElementById('gc-draw');
+const gcHover = document.getElementById('gc-hover');
+const gcPause = document.getElementById('gc-pause');
+
+// ── CANVAS RESIZE ─────────────────────────────────────────────
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const W = window.innerWidth, H = window.innerHeight;
+
+  // Preserve drawing
+  const tmp = document.createElement('canvas');
+  tmp.width = drawCanvas.width; tmp.height = drawCanvas.height;
+  tmp.getContext('2d').drawImage(drawCanvas, 0, 0);
+
+  [drawCanvas, ovCanvas].forEach(c => {
+    c.width = W * dpr; c.height = H * dpr;
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    c.getContext('2d').scale(dpr, dpr);
+  });
+  dctx.drawImage(tmp, 0, 0, W, H);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Skeleton canvas size (matched to video)
+function resizeSkel() {
+  const el = camVid;
+  const W = el.offsetWidth, H = el.offsetHeight;
+  skelCanvas.width  = W; skelCanvas.height = H;
+  skelCanvas.style.width  = W + 'px'; skelCanvas.style.height = H + 'px';
+}
+
+// ── STATUS & LOADING ──────────────────────────────────────────
+function setStatus(cls, msg) { sdot.className = 'sdot ' + cls; stxt.textContent = msg; }
+function setLoad(p)           { lbar.style.width = Math.min(100, p) + '%'; }
+function hideLoad()           { setTimeout(() => loadOvl.classList.add('gone'), 700); }
+
+let toastT;
+function showToast(m) {
+  toast.textContent = m; toast.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+// ── BRUSH SLIDER ─────────────────────────────────────────────
+const bslider = document.getElementById('bslider');
+const bval    = document.getElementById('bval');
+bslider.addEventListener('input', () => {
+  S.brush = +bslider.value;
+  bval.textContent = S.brush;
+  const p = ((S.brush - 2) / 28 * 100).toFixed(1) + '%';
+  bslider.style.setProperty('--v', p);
+});
+
+// ── COLOR BUTTONS ────────────────────────────────────────────
+document.querySelectorAll('.cb').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.cb').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  S.color = b.dataset.c;
+}));
+
+// ── CLEAR / SAVE ─────────────────────────────────────────────
+document.getElementById('clearBtn').addEventListener('click', () => {
+  dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  S.particles = []; showToast('CANVAS CLEARED');
+});
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const ex = document.createElement('canvas');
+  ex.width = drawCanvas.width; ex.height = drawCanvas.height;
+  const ec = ex.getContext('2d');
+  ec.fillStyle = '#04040e';
+  ec.fillRect(0, 0, ex.width, ex.height);
+  ec.drawImage(drawCanvas, 0, 0);
+  const a = document.createElement('a');
+  a.download = 'airdraw-' + new Date().toISOString().slice(0,19).replace(/[:.]/g,'-') + '.png';
+  a.href = ex.toDataURL('image/png');
+  a.click();
+  showToast('ARTWORK EXPORTED ✓');
+});
+
+// ══════════════════════════════════════════════════════════════
+// GESTURE DETECTION ENGINE
+// ══════════════════════════════════════════════════════════════
+
+/** 2D Euclidean distance between two MediaPipe landmark objects */
+function lmDist(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * isExtended — Distance-ratio method
+ * Returns 0.0 (fully curled) → 1.0 (fully extended)
+ *
+ * How it works:
+ *   If the fingertip is farther from the wrist than the PIP joint,
+ *   the finger is extended. We use a soft ratio to get a continuous score.
+ *
+ * @param {Array}  lm      - landmarks array
+ * @param {number} tipIdx  - landmark index of fingertip
+ * @param {number} pipIdx  - landmark index of PIP joint
+ * @param {number} wristIdx - landmark index of wrist (always 0)
+ */
+function extensionScore(lm, tipIdx, pipIdx, wristIdx) {
+  const wrist = lm[wristIdx];
+  const tipD  = lmDist(lm[tipIdx], wrist);
+  const pipD  = lmDist(lm[pipIdx], wrist);
+  if (pipD < 0.001) return 0;
+  // ratio > 1 means tip is further than pip → extended
+  const ratio = tipD / pipD;
+  // Map: ratio 0.85 → 0.0 (curled), ratio 1.35 → 1.0 (extended)
+  return Math.max(0, Math.min(1, (ratio - 0.85) / 0.5));
+}
+
+/**
+ * classifyGesture — Reads 4 finger extension scores and outputs gesture
+ *
+ * DRAW  : Only index extended (middle score < 0.45)
+ * HOVER : Index extended AND middle extended (both > 0.5)
+ * PAUSE : Everything else (fist, open palm, ring/pinky dominant, etc.)
+ */
+function classifyGesture(scores) {
+  const [si, sm, sr, sp] = scores; // index, middle, ring, pinky
+
+  const indexUp  = si > 0.50;
+  const middleUp = sm > 0.50;
+  const ringUp   = sr > 0.50;
+  const pinkyUp  = sp > 0.50;
+  const nUp      = [indexUp, middleUp, ringUp, pinkyUp].filter(Boolean).length;
+
+  // Open palm (3+ fingers) or no fingers → PAUSE
+  if (nUp >= 3 || nUp === 0) return 'pause';
+
+  // Both index + middle up → HOVER (pen lifted)
+  if (indexUp && middleUp && !ringUp && !pinkyUp) return 'hover';
+  if (indexUp && middleUp) return 'hover'; // even with others (safer)
+
+  // Only index up → DRAW
+  if (indexUp && !middleUp) return 'draw';
+
+  return 'pause';
+}
+
+/**
+ * smoothGesture — majority vote over BUFFER_LEN recent frames
+ * Prevents single-frame flicker between gesture states
+ */
+function smoothGesture(newGesture) {
+  S.gestureBuffer.push(newGesture);
+  if (S.gestureBuffer.length > BUFFER_LEN) S.gestureBuffer.shift();
+
+  const counts = { draw:0, hover:0, pause:0 };
+  for (const g of S.gestureBuffer) counts[g]++;
+  return Object.keys(counts).reduce((a, b) => counts[a] >= counts[b] ? a : b);
+}
+
+// ══════════════════════════════════════════════════════════════
+// FINGER HUD UPDATE
+// ══════════════════════════════════════════════════════════════
+const fKeys = ['idx','mid','rng','pnk'];
+
+function updateFingerHud(scores, gesture) {
+  scores.forEach((s, i) => {
+    const up  = s > 0.50;
+    const pct = (s * 100).toFixed(0) + '%';
+    const els = fEls[fKeys[i]];
+    els.bar.style.width = pct;
+    els.bar.className   = 'fbar-fill' + (up ? ' up' : '');
+    els.pin.className   = 'fpin ' + (up ? 'up' : 'dn');
+  });
+
+  gbadge.textContent = gesture === 'draw'  ? '✦ DRAWING'
+                     : gesture === 'hover' ? '○ PEN LIFTED'
+                     : '— PAUSED';
+  gbadge.className = 'gesture-badge ' + (gesture === 'draw' ? 'draw' : gesture === 'hover' ? 'hover' : 'pause');
+
+  // Guide card highlights
+  gcDraw.className  = 'gcard' + (gesture === 'draw'  ? ' active-draw'  : '');
+  gcHover.className = 'gcard' + (gesture === 'hover' ? ' active-hover' : '');
+  gcPause.className = 'gcard' + (gesture === 'pause' ? ' active-pause' : '');
+}
+
+function clearFingerHud() {
+  fKeys.forEach(k => {
+    fEls[k].bar.style.width = '0%';
+    fEls[k].bar.className   = 'fbar-fill';
+    fEls[k].pin.className   = 'fpin dn';
+  });
+  gbadge.textContent = 'NO HAND'; gbadge.className = 'gesture-badge';
+  gcDraw.className = gcHover.className = gcPause.className = 'gcard';
+}
+
+// ══════════════════════════════════════════════════════════════
+// SKELETON OVERLAY RENDERER
+// ══════════════════════════════════════════════════════════════
+
+function drawSkeleton(lm, scores) {
+  const W = skelCanvas.width, H = skelCanvas.height;
+  sctx.clearRect(0, 0, W, H);
+  if (!lm) return;
+
+  // Mirror x for skeleton (video is mirrored via CSS, canvas is not)
+  // We un-mirror in canvas space
+  function toSkel(lmPt) {
+    return {
+      x: (1 - lmPt.x) * W,  // mirror x
+      y: lmPt.y * H,
+    };
+  }
+
+  // Draw connections
+  sctx.globalAlpha = SKEL_ALPHA;
+  SKEL_CONNECTIONS.forEach(([a, b]) => {
+    const pa = toSkel(lm[a]), pb = toSkel(lm[b]);
+    sctx.save();
+    sctx.beginPath();
+    sctx.moveTo(pa.x, pa.y); sctx.lineTo(pb.x, pb.y);
+    sctx.strokeStyle = '#00fff7';
+    sctx.lineWidth   = 1.2;
+    sctx.shadowBlur  = 5; sctx.shadowColor = '#00fff7';
+    sctx.globalAlpha = 0.45;
+    sctx.stroke(); sctx.restore();
+  });
+
+  // Draw fingertip dots — color coded by extension
+  const fingerTips = [
+    { idx: LM.I_TIP, score: scores[0] },
+    { idx: LM.M_TIP, score: scores[1] },
+    { idx: LM.R_TIP, score: scores[2] },
+    { idx: LM.P_TIP, score: scores[3] },
+  ];
+
+  fingerTips.forEach(({ idx, score }) => {
+    const pt = toSkel(lm[idx]);
+    const clr = score > 0.5 ? '#00ff88' : '#ff4477';
+    sctx.save();
+    sctx.beginPath(); sctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
+    sctx.fillStyle = clr;
+    sctx.shadowBlur = 8; sctx.shadowColor = clr;
+    sctx.globalAlpha = 0.9;
+    sctx.fill(); sctx.restore();
+  });
+
+  // Wrist dot
+  const wp = toSkel(lm[LM.WRIST]);
+  sctx.save();
+  sctx.beginPath(); sctx.arc(wp.x, wp.y, 4, 0, Math.PI * 2);
+  sctx.fillStyle = '#00fff7';
+  sctx.shadowBlur = 10; sctx.shadowColor = '#00fff7';
+  sctx.globalAlpha = 0.8;
+  sctx.fill(); sctx.restore();
+  sctx.globalAlpha = 1;
+}
+
+// ══════════════════════════════════════════════════════════════
+// DRAWING ENGINE — NEON GLOW BRUSH
+// ══════════════════════════════════════════════════════════════
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function dist2(x0,y0,x1,y1){ const dx=x1-x0,dy=y1-y0; return Math.sqrt(dx*dx+dy*dy); }
+
+function drawSegment(x0, y0, x1, y1) {
+  const col  = COLORS[S.color];
+  const size = S.brush;
+  const dpr  = window.devicePixelRatio || 1;
+
+  dctx.save();
+
+  // Layer 1 — ultra-soft wide aura
+  dctx.globalCompositeOperation = 'screen';
+  dctx.beginPath(); dctx.moveTo(x0, y0); dctx.lineTo(x1, y1);
+  dctx.lineWidth   = size * 5;
+  dctx.lineCap     = 'round'; dctx.lineJoin = 'round';
+  dctx.strokeStyle = `rgba(${col.r},${col.g},${col.b},0.06)`;
+  dctx.shadowBlur  = 0;
+  dctx.stroke();
+
+  // Layer 2 — mid glow ring
+  dctx.beginPath(); dctx.moveTo(x0, y0); dctx.lineTo(x1, y1);
+  dctx.lineWidth   = size * 2.4;
+  dctx.strokeStyle = `rgba(${col.r},${col.g},${col.b},0.45)`;
+  dctx.shadowBlur  = size * 2.8 * dpr;
+  dctx.shadowColor = col.shadow;
+  dctx.stroke();
+
+  // Layer 3 — bright core
+  dctx.beginPath(); dctx.moveTo(x0, y0); dctx.lineTo(x1, y1);
+  dctx.lineWidth   = size * 0.5;
+  dctx.strokeStyle = '#ffffff';
+  dctx.shadowBlur  = size * 1.2 * dpr;
+  dctx.shadowColor = col.shadow;
+  dctx.stroke();
+
+  dctx.restore();
+
+  // Particle emission
+  if (Math.random() < 0.38) {
+    const t  = Math.random();
+    const px = x0 + (x1-x0)*t, py = y0 + (y1-y0)*t;
+    emitParticle(px, py, col);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// PARTICLE SYSTEM
+// ══════════════════════════════════════════════════════════════
+function emitParticle(x, y, col) {
+  const angle = Math.random() * Math.PI * 2;
+  const spd   = 0.3 + Math.random() * 1.1;
+  S.particles.push({
+    x, y,
+    vx: Math.cos(angle) * spd,
+    vy: Math.sin(angle) * spd,
+    life: 1.0,
+    decay: 0.018 + Math.random() * 0.025,
+    size: 0.8 + Math.random() * 1.8,
+    r: col.r, g: col.g, b: col.b,
+  });
+}
+
+function tickParticles() {
+  const dead = [];
+  for (let i = 0; i < S.particles.length; i++) {
+    const p = S.particles[i];
+    p.x  += p.vx; p.y  += p.vy;
+    p.vx *= 0.95; p.vy *= 0.95;
+    p.life = Math.max(0, p.life - p.decay);
+    if (p.life <= 0) dead.push(i);
+  }
+  for (let i = dead.length - 1; i >= 0; i--) S.particles.splice(dead[i], 1);
+}
+
+function renderParticles() {
+  dctx.save();
+  dctx.globalCompositeOperation = 'screen';
+  for (const p of S.particles) {
+    const a   = p.life;
+    const sz  = Math.max(0.1, p.size * p.life);
+    const hex = Math.round(a * 200).toString(16).padStart(2,'0');
+    dctx.beginPath(); dctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    dctx.fillStyle  = `rgba(${p.r},${p.g},${p.b},${a})`;
+    dctx.shadowBlur = 6; dctx.shadowColor = `rgb(${p.r},${p.g},${p.b})`;
+    dctx.fill();
+  }
+  dctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════════
+// HOVER CURSOR (drawn on overlay canvas each RAF — non-persistent)
+// ══════════════════════════════════════════════════════════════
+let hoverX = null, hoverY = null;
+
+function renderHover() {
+  octx.clearRect(0, 0, ovCanvas.width, ovCanvas.height);
+  if (hoverX === null || S.gesture !== 'hover') return;
+
+  const col = COLORS[S.color];
+  const r   = S.brush * 1.5 + 9;
+
+  octx.save();
+  octx.beginPath(); octx.arc(hoverX, hoverY, r, 0, Math.PI * 2);
+  octx.strokeStyle = `rgba(${col.r},${col.g},${col.b},0.85)`;
+  octx.lineWidth   = 1.6;
+  octx.shadowBlur  = 14; octx.shadowColor = col.shadow;
+  octx.stroke();
+
+  octx.setLineDash([3,5]);
+  octx.beginPath(); octx.arc(hoverX, hoverY, r+6, 0, Math.PI*2);
+  octx.strokeStyle = `rgba(${col.r},${col.g},${col.b},0.25)`;
+  octx.lineWidth   = 1; octx.shadowBlur = 0;
+  octx.stroke();
+  octx.setLineDash([]);
+
+  octx.beginPath(); octx.arc(hoverX, hoverY, 2.5, 0, Math.PI*2);
+  octx.fillStyle  = '#fff';
+  octx.shadowBlur = 8; octx.shadowColor = col.shadow;
+  octx.fill();
+  octx.restore();
+}
+
+// ══════════════════════════════════════════════════════════════
+// MEDIAPIPE RESULT HANDLER
+// ══════════════════════════════════════════════════════════════
+
+function onResults(results) {
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    // No hand detected — clear everything
+    S.hasHand  = false;
+    S.gesture  = 'pause';
+    S.gestureBuffer = [];
+    S.prevX    = S.prevY = null;
+    hoverX     = hoverY = null;
+    cur.style.opacity = '0';
+    clearFingerHud();
+    drawSkeleton(null, [0,0,0,0]);
+    setStatus('id', 'Ready — Raise your hand');
+    return;
+  }
+
+  S.hasHand = true;
+  const lm = results.multiHandLandmarks[0];
+
+  // ── 1. Compute extension scores for all 4 fingers ──────────
+  const scores = [
+    extensionScore(lm, LM.I_TIP, LM.I_PIP, LM.WRIST),  // index
+    extensionScore(lm, LM.M_TIP, LM.M_PIP, LM.WRIST),  // middle
+    extensionScore(lm, LM.R_TIP, LM.R_PIP, LM.WRIST),  // ring
+    extensionScore(lm, LM.P_TIP, LM.P_PIP, LM.WRIST),  // pinky
+  ];
+  S.fingerScores = scores;
+
+  // ── 2. Classify + smooth gesture ──────────────────────────
+  const rawGesture = classifyGesture(scores);
+  S.gesture        = smoothGesture(rawGesture);
+
+  // ── 3. Update finger HUD & skeleton ───────────────────────
+  updateFingerHud(scores, S.gesture);
+  drawSkeleton(lm, scores);
+
+  // ── 4. Get index fingertip position (mirrored) ─────────────
+  const tip  = lm[LM.I_TIP];
+  const rawX = (1 - tip.x) * window.innerWidth;
+  const rawY = tip.y * window.innerHeight;
+
+  // ── 5. Adaptive lerp — fast for big jumps, slow for fine moves
+  if (S.smoothX === null) { S.smoothX = rawX; S.smoothY = rawY; }
+  const jumpDist = dist2(S.smoothX, S.smoothY, rawX, rawY);
+  const alpha    = jumpDist > JUMP_THRESH ? LERP_FAST : LERP_ALPHA;
+  S.smoothX      = lerp(S.smoothX, rawX, alpha);
+  S.smoothY      = lerp(S.smoothY, rawY, alpha);
+  const sx = S.smoothX, sy = S.smoothY;
+
+  // ── 6. Move CSS cursor dot ─────────────────────────────────
+  cur.style.left = sx + 'px'; cur.style.top = sy + 'px';
+
+  // ── 7. Gesture-specific actions ───────────────────────────
+  if (S.gesture === 'draw') {
+    cur.style.opacity = '1';
+    setStatus('dr', '✦ Drawing Mode Active');
+    hoverX = sx; hoverY = sy;
+
+    if (S.prevX !== null) {
+      const d = dist2(S.prevX, S.prevY, sx, sy);
+      if (d > MIN_DRAW_DIST) drawSegment(S.prevX, S.prevY, sx, sy);
+    }
+    S.prevX = sx; S.prevY = sy;
+
+  } else if (S.gesture === 'hover') {
+    cur.style.opacity = '0.5';
+    setStatus('hv', '○ Pen Lifted — Close fingers to Draw');
+    S.prevX = S.prevY = null;  // lift pen
+    hoverX  = sx; hoverY = sy;
+
+  } else {
+    // pause
+    cur.style.opacity = '0';
+    setStatus('id', '– Paused — Extend index finger to Draw');
+    S.prevX = S.prevY = null;
+    hoverX  = hoverY = null;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// RAF LOOP
+// ══════════════════════════════════════════════════════════════
+function raf() {
+  tickParticles();
+  renderParticles();
+  renderHover();
+  requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
+
+// ══════════════════════════════════════════════════════════════
+// MEDIAPIPE INIT
+// ══════════════════════════════════════════════════════════════
+async function init() {
+  setStatus('ld', 'Initializing AI Models...');
+  setLoad(8);
+
+  const hands = new Hands({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  });
+
+  hands.setOptions({
+    maxNumHands:            1,
+    modelComplexity:        1,      // 1 = full accuracy
+    minDetectionConfidence: 0.65,
+    minTrackingConfidence:  0.60,
+  });
+
+  hands.onResults(onResults);
+  setLoad(35);
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+      audio: false,
+    });
+    srcVid.srcObject = stream;
+    camVid.srcObject = stream;
+
+    await new Promise(r => { srcVid.onloadedmetadata = r; });
+    setLoad(60);
+
+    camVid.classList.add('on');
+    resizeSkel();
+    window.addEventListener('resize', resizeSkel);
+    setLoad(75);
+
+    const camera = new Camera(srcVid, {
+      onFrame: async () => { await hands.send({ image: srcVid }); },
+      width: 640, height: 480,
+    });
+    await camera.start();
+
+    setLoad(100);
+    setStatus('id', 'Ready — Raise your hand');
+    hideLoad();
+    showToast('◈ NEURAL CANVAS READY');
+
+  } catch (err) {
+    console.error('Init error:', err);
+    setStatus('er', 'Camera access denied — check permissions');
+    setLoad(100);
+    hideLoad();
+    showToast('⚠ CAMERA PERMISSION REQUIRED');
+  }
+}
+
+// Boot
+setLoad(5);
+setTimeout(() => setLoad(15), 300);
+setTimeout(() => setLoad(25), 700);
+window.addEventListener('load', () => setTimeout(init, 350));
+</script>
+</body>
+</html>
