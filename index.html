@@ -14,8 +14,8 @@
     /* ═══════════════════════ ROOT VARS & THEME ═══════════════════════ */
     :root {
       --bg:          #04040e;
-      --panel:       rgba(6, 6, 20, 0.85);
-      --gborder:     rgba(0, 255, 247, 0.15);
+      --panel:       rgba(6, 6, 20, 0.75);
+      --gborder:     rgba(0, 255, 247, 0.2);
       --cyan:        #00fff7;
       --cyan-dim:    rgba(0, 255, 247, 0.55);
       --magenta:     #ff00e5;
@@ -57,29 +57,44 @@
       border-radius: 4px;
     }
 
-    /* ═══════════════════════ BACKGROUND FX ═══════════════════════ */
-    body::before {
-      content: '';
-      position: fixed;
+    /* ═══════════════════════ BACKGROUND FX (AR MIRROR) ═══════════════════════ */
+    #bgVid {
+      position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
       z-index: 0;
-      background-image: 
-        linear-gradient(rgba(0, 255, 247, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 247, 0.02) 1px, transparent 1px);
-      background-size: 40px 40px;
-      animation: gridMove 20s linear infinite;
-      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s ease;
     }
-    
-    body::after {
-      content: '';
-      position: fixed;
+
+    #bgVid.on {
+      opacity: 1;
+    }
+
+    #bgOverlay {
+      position: absolute;
       inset: 0;
-      z-index: 0;
+      z-index: 1;
       pointer-events: none;
-      background: 
+      background: rgba(4, 4, 14, 0.75); /* Dark enough for neon to pop */
+      background-image: 
         radial-gradient(circle at 50% 0%, rgba(0, 130, 255, 0.08) 0%, transparent 60%),
         radial-gradient(circle at 85% 100%, rgba(191, 64, 255, 0.06) 0%, transparent 60%);
+    }
+
+    #bgGrid {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background-image: 
+        linear-gradient(rgba(0, 255, 247, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 247, 0.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridMove 20s linear infinite;
     }
 
     @keyframes gridMove {
@@ -94,7 +109,7 @@
       height: 100dvh;
       display: flex;
       flex-direction: column;
-      z-index: 1;
+      z-index: 5;
     }
 
     #drawCanvas, #overlayCanvas {
@@ -104,8 +119,8 @@
       height: 100%;
     }
     
-    #drawCanvas { z-index: 2; cursor: none; }
-    #overlayCanvas { z-index: 3; pointer-events: none; }
+    #drawCanvas { z-index: 10; cursor: none; }
+    #overlayCanvas { z-index: 11; pointer-events: none; }
 
     /* ═══════════════════════ HEADER ═══════════════════════ */
     #header {
@@ -288,6 +303,13 @@
       box-shadow: 0 0 20px rgba(255, 30, 80, 0.15);
     }
 
+    .abtn.help-btn:hover {
+      background: rgba(191, 64, 255, 0.1);
+      border-color: rgba(191, 64, 255, 0.5);
+      color: var(--violet);
+      box-shadow: 0 0 20px rgba(191, 64, 255, 0.15);
+    }
+
     /* ═══════════════════════ STATUS HUB ═══════════════════════ */
     #statHub {
       position: absolute;
@@ -431,6 +453,34 @@
     .gesture-badge.hover { color: var(--green); border-color: rgba(0, 255, 136, 0.4); background: rgba(0, 255, 136, 0.08); box-shadow: 0 0 16px rgba(0, 255, 136, 0.15); }
     .gesture-badge.pause { color: var(--amber); border-color: rgba(255, 184, 0, 0.4); background: rgba(255, 184, 0, 0.08); }
 
+    /* ═══════════════════════ INSTAGRAM HANDLE ═══════════════════════ */
+    #igHandle {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      writing-mode: vertical-rl;
+      font-family: var(--fm);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      color: rgba(0, 255, 247, 0.5);
+      text-decoration: none;
+      z-index: 30;
+      transition: var(--ease);
+      text-shadow: 0 0 10px rgba(0, 255, 247, 0);
+      cursor: pointer;
+    }
+
+    #igHandle:hover {
+      color: var(--cyan);
+      text-shadow: 0 0 12px rgba(0, 255, 247, 0.6);
+    }
+
+    #igHandle span {
+      color: var(--magenta);
+    }
+
     /* ═══════════════════════ CAMERA PREVIEW ═══════════════════════ */
     #camWrap {
       position: absolute;
@@ -470,7 +520,6 @@
       pointer-events: none;
     }
 
-    /* Cyper-corners */
     .cam-frame::before, .cam-frame::after, .cbl, .cbr { content: ''; position: absolute; width: 16px; height: 16px; z-index: 4; pointer-events: none; }
     .cam-frame::before { top: 0; left: 0; border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); border-radius: 8px 0 0 0; box-shadow: -2px -2px 10px rgba(0, 255, 247, 0.4); }
     .cam-frame::after { top: 0; right: 0; border-top: 2px solid var(--cyan); border-right: 2px solid var(--cyan); border-radius: 0 8px 0 0; box-shadow: 2px -2px 10px rgba(0, 255, 247, 0.4); }
@@ -550,6 +599,115 @@
     .gcard.active-hover { background: rgba(0, 255, 136, 0.1); border-bottom: 2px solid var(--green); }
     .gcard.active-pause { background: rgba(255, 184, 0, 0.1); border-bottom: 2px solid var(--amber); }
 
+    /* ═══════════════════════ INSTRUCTIONS MODAL ═══════════════════════ */
+    #helpModal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: var(--ease);
+    }
+
+    #helpModal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .help-content {
+      background: var(--panel);
+      border: 1px solid var(--gborder);
+      border-radius: var(--r);
+      width: 90%;
+      max-width: 500px;
+      padding: 28px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 255, 247, 0.1);
+      transform: translateY(20px);
+      transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    #helpModal.show .help-content {
+      transform: translateY(0);
+    }
+
+    .help-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--fd);
+      font-size: 16px;
+      color: var(--cyan);
+      border-bottom: 1px solid var(--gborder);
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      letter-spacing: 0.15em;
+    }
+
+    .help-close {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--gborder);
+      color: var(--soft);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--ease);
+    }
+
+    .help-close:hover {
+      background: rgba(255, 0, 229, 0.15);
+      border-color: var(--magenta);
+      color: var(--magenta);
+    }
+
+    .help-body {
+      font-family: var(--fb);
+      font-size: 16px;
+      color: var(--soft);
+      line-height: 1.6;
+    }
+
+    .help-body p { margin-bottom: 12px; }
+    
+    .help-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .help-icon { font-size: 24px; line-height: 1; }
+    
+    .help-text h4 {
+      font-family: var(--fm);
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+    
+    .help-text p {
+      font-size: 14px;
+      color: rgba(210, 225, 255, 0.7);
+      margin: 0;
+    }
+
+    .h-magenta { color: var(--magenta); }
+    .h-green { color: var(--green); }
+    .h-amber { color: var(--amber); }
+
     /* ═══════════════════════ COPYRIGHT FOOTER ═══════════════════════ */
     #copy {
       position: absolute;
@@ -599,7 +757,7 @@
     #loadOvl {
       position: fixed;
       inset: 0;
-      z-index: 1000;
+      z-index: 2000;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -673,6 +831,7 @@
       #camWrap { width: 120px; left: 12px; bottom: 48px; }
       #guide { display: none; }
       #copy { font-size: 7px; letter-spacing: 0.15em; bottom: 8px; }
+      #igHandle { right: 8px; font-size: 9px; }
     }
 
     @media (max-height: 500px) and (orientation: landscape) {
@@ -690,6 +849,10 @@
   <div class="lsub">INITIALIZING NEURAL CANVAS INTERFACE</div>
   <div class="lbar-w"><div class="lbar" id="lbar"></div></div>
 </div>
+
+<video id="bgVid" autoplay playsinline muted></video>
+<div id="bgOverlay"></div>
+<div id="bgGrid"></div>
 
 <div id="app">
   <canvas id="drawCanvas"></canvas>
@@ -722,6 +885,10 @@
     <div class="sep"></div>
     
     <div class="acts">
+      <button class="abtn help-btn" id="helpBtn" aria-label="Help / Instructions">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>HELP</span>
+      </button>
       <button class="abtn danger" id="clearBtn" aria-label="Clear Canvas">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
         <span>CLEAR</span>
@@ -795,6 +962,46 @@
     </div>
   </div>
 
+  <div id="helpModal" aria-hidden="true">
+    <div class="help-content">
+      <div class="help-header">
+        <span>SYSTEM INSTRUCTIONS</span>
+        <button id="closeHelpBtn" class="help-close" aria-label="Close Help">✕</button>
+      </div>
+      <div class="help-body">
+        <p>Welcome to <strong>AIR DRAW</strong>. Ensure your hand is clearly visible in the camera frame to control the interface.</p>
+        
+        <div class="help-row">
+          <div class="help-icon">☝️</div>
+          <div class="help-text">
+            <h4 class="h-magenta">DRAW MODE</h4>
+            <p>Extend <strong>ONLY</strong> your index finger to paint onto the canvas.</p>
+          </div>
+        </div>
+        
+        <div class="help-row">
+          <div class="help-icon">✌️</div>
+          <div class="help-text">
+            <h4 class="h-green">HOVER / LIFT PEN</h4>
+            <p>Extend both your <strong>index</strong> and <strong>middle</strong> fingers to move the cursor without drawing.</p>
+          </div>
+        </div>
+        
+        <div class="help-row">
+          <div class="help-icon">🖐️</div>
+          <div class="help-text">
+            <h4 class="h-amber">PAUSE TRACKING</h4>
+            <p>Open your palm completely or close your fist to pause input and freeze the cursor.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a id="igHandle" href="https://instagram.com/realvrishabvarun" target="_blank" aria-label="Creator Instagram">
+    <span>IG</span> @REALVRISHABVARUN
+  </a>
+
   <div id="copy">© 2026 VRISHAB VARUN • AIR DRAW™ • ALL RIGHTS RESERVED</div>
   
   <div id="toast" aria-live="assertive"></div>
@@ -806,7 +1013,7 @@
 <script>
 /**
  * ════════════════════════════════════════════════════════════════
- * AIR DRAW v3.0 — Production Build
+ * AIR DRAW v3.0 — Production Build with AR Mirror
  * Author: Vrishab Varun
  * ════════════════════════════════════════════════════════════════
  */
@@ -867,11 +1074,13 @@ const State = {
   fingerScores: [0, 0, 0, 0],
   hasHand: false,
   particles: [],
-  dpr: window.devicePixelRatio || 1
+  dpr: window.devicePixelRatio || 1,
+  streamLinked: false
 };
 
 // ── DOM ELEMENTS ─────────────────────────────────────────────────
 const DOM = {
+  bgVid: document.getElementById('bgVid'),
   drawCanvas: document.getElementById('drawCanvas'),
   ovCanvas: document.getElementById('overlayCanvas'),
   skelCanvas: document.getElementById('skelCanvas'),
@@ -886,6 +1095,9 @@ const DOM = {
   colorBtns: document.querySelectorAll('.cb'),
   clearBtn: document.getElementById('clearBtn'),
   saveBtn: document.getElementById('saveBtn'),
+  helpBtn: document.getElementById('helpBtn'),
+  helpModal: document.getElementById('helpModal'),
+  closeHelpBtn: document.getElementById('closeHelpBtn'),
   gbadge: document.getElementById('gbadge'),
   fEls: {
     idx: { bar: document.getElementById('f-idx-bar'), pin: document.getElementById('f-idx-pin') },
@@ -996,8 +1208,22 @@ DOM.saveBtn.addEventListener('click', () => {
   ex.height = DOM.drawCanvas.height;
   const ec = ex.getContext('2d');
   
-  ec.fillStyle = '#04040e';
-  ec.fillRect(0, 0, ex.width, ex.height);
+  // Draw current camera frame as background for export
+  if(DOM.bgVid.videoWidth) {
+    ec.save();
+    ec.translate(ex.width, 0);
+    ec.scale(-1, 1);
+    ec.drawImage(DOM.bgVid, 0, 0, ex.width, ex.height);
+    ec.restore();
+    
+    // Add the dim overlay effect
+    ec.fillStyle = 'rgba(4, 4, 14, 0.75)';
+    ec.fillRect(0, 0, ex.width, ex.height);
+  } else {
+    ec.fillStyle = '#04040e';
+    ec.fillRect(0, 0, ex.width, ex.height);
+  }
+  
   ec.drawImage(DOM.drawCanvas, 0, 0);
   
   // Apply Auto Watermark
@@ -1014,6 +1240,13 @@ DOM.saveBtn.addEventListener('click', () => {
   a.href = ex.toDataURL('image/png');
   a.click();
   showToast('ARTWORK EXPORTED ✓');
+});
+
+// Help Modal Logic
+DOM.helpBtn.addEventListener('click', () => DOM.helpModal.classList.add('show'));
+DOM.closeHelpBtn.addEventListener('click', () => DOM.helpModal.classList.remove('show'));
+DOM.helpModal.addEventListener('click', (e) => {
+  if (e.target === DOM.helpModal) DOM.helpModal.classList.remove('show');
 });
 
 // ── GESTURE MATH ─────────────────────────────────────────────────
@@ -1191,6 +1424,13 @@ function drawSkeleton(landmarks) {
 }
 
 function onResults(results) {
+  // Sync the AR mirror background video stream
+  if (!State.streamLinked && DOM.camVid.srcObject) {
+    DOM.bgVid.srcObject = DOM.camVid.srcObject;
+    DOM.bgVid.classList.add('on');
+    State.streamLinked = true;
+  }
+
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     State.hasHand = true;
     const lm = results.multiHandLandmarks[0];
